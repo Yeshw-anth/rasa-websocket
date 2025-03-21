@@ -233,7 +233,7 @@
       let userRole = ""; // Will store selected role
 
       // Socket connection
-      const socket = io("http://2e87-14-194-40-218.ngrok-free.app", {
+      const socket = io("http://localhost:5005", {
         transports: ["websocket"],
         reconnectionAttempts: 5
       });
