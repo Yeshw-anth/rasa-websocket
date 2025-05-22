@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Socket.IO Chat with Quick Replies & Local Storage</title>
+    <style>
+      :root {
+        /* Volta-inspired aqua color */
+        --volta-blue: #00a0df;
+        --volta-blue-dark: #0084b9;
+        --white: #ffffff;
+        --black: #000000;
+        --light-gray: #f7f7f7;
+      }
+
+      body {
+        font-family: Roboto, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--light-gray);
+      }
+
+      /* Login Container */
+      #login-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background-color: var(--volta-blue);
+        color: var(--white);
+      }
+
+      #login-container h2 {
+        margin-bottom: 20px;
+      }
+
+      #login-container input,
+      #login-container select {
+        padding: 10px;
+        border-radius: 5px;
+        border: 2px solid var(--white);
+        margin-bottom: 10px;
+        width: 220px;
+        font-size: 16px;
+        color: var(--black);
+      }
+
+      #login-container input::placeholder {
+        color: #666;
+      }
+
+      #login-container button {
+        background: var(--volta-blue);
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        color: var(--white);
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      #login-container button:hover {
+        background: var(--volta-blue-dark);
+      }
+
+      /* Chat Container */
+      #chat-container {
+        display: none;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      .header {
+        background-color: var(--volta-blue);
+        color: var(--white);
+        text-align: center;
+        padding: 12px;
+        position: relative;
+      }
+
+      .title {
+        font-size: 23px;
+        margin: 0;
+      }
+
+      #clear-history {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: var(--volta-blue);
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        color: var(--white);
+        cursor: pointer;
+      }
+
+      #clear-history:hover {
+        background: var(--volta-blue-dark);
+      }
+
+      #messages {
+        flex: 1;
+        padding: 10px;
+        overflow-y: auto;
+        background-color: var(--white);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .message {
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        word-wrap: break-word;
+        max-width: 70%;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .message_received {
+        background: var(--light-gray);
+        color: var(--black);
+        border-bottom-left-radius: 0;
+        align-self: flex-start;
+      }
+
+      .message_sent {
+        background: var(--volta-blue);
+        color: var(--white);
+        border-bottom-right-radius: 0;
+        align-self: flex-end;
+      }
+
+      #form {
+        display: flex;
+        background-color: var(--volta-blue);
+        padding: 0.5rem;
+      }
+
+      #message-input {
+        flex-grow: 1;
+        padding: 0 1rem;
+        border-radius: 2rem;
+        border: none;
+        font-size: 16px;
+      }
+
+      #message-input:focus {
+        outline: none;
+      }
+
+      .button {
+        background: var(--volta-blue);
+        border: none;
+        padding: 0 15px;
+        margin-left: 0.5rem;
+        border-radius: 5px;
+        color: var(--white);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .button:hover {
+        background: var(--volta-blue-dark);
+      }
+
+      .button:active {
+        background: var(--volta-blue-dark);
+      }
+
+      .quick-replies {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 10px;
+      }
+
+      .quick-replies .button {
+        padding: 6px 10px;
+        font-size: 14px;
+      }
+    </style>
+    <!-- Socket.IO client library from CDN -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"
+      integrity="sha512-PU5S6BA03fRv1Q5fpwXjg5nlRrgdoguZ74urFInkbABMCENyx5oP3hrDzYMMPh3qdLdknIvrGj3yqZ4JuU7Nag=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+  </head>
+  <body>
+    <!-- Login Container -->
+    <div id="login-container">
+      <h2>Please enter your details</h2>
+      <input id="userid-input" type="text" placeholder="User ID" />
+
+      <!-- Role Selection Dropdown -->
+      <select id="role-selection">
+        <option value="User">User</option>
+        <option value="Driver">Driver</option>
+      </select>
+
+      <button id="login-button">Login</button>
+    </div>
+
+    <!-- Chat Container -->
+    <div id="chat-container">
+      <header class="header">
+        <p class="title">Chat with Volta Chatbot</p>
+        <button id="clear-history">Clear History</button>
+      </header>
+      <div id="messages"></div>
+      <form id="form">
+        <input id="message-input" name="message" autocomplete="off" placeholder="Enter your message" />
+        <button class="button" type="submit">Send</button>
+      </form>
+    </div>
+
+    <script>
+      const loginContainer = document.getElementById("login-container");
+      const chatContainer = document.getElementById("chat-container");
+      const useridInput = document.getElementById("userid-input");
+      const loginButton = document.getElementById("login-button");
+      const clearHistoryButton = document.getElementById("clear-history");
+      const messages = document.getElementById("messages");
+      const form = document.getElementById("form");
+      const messageInput = document.getElementById("message-input");
+      const roleSelection = document.getElementById("role-selection");
+
+      let userId = ""; // Will be set on login
+      let userRole = ""; // Will store selected role
+
+      // Socket connection
+      const socket = io("http://localhost:5005", {
+        transports: ["websocket"],
+        reconnectionAttempts: 5
+      });
+
+      socket.on("connect", () => {
+        console.log("✅ Socket connected");
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("❌ Connection error:", err);
+      });
+
+      // Function to check chat history and send /greet if none exists
+      function sendGreetIfNoHistory() {
+        const chatKey = `chat_${userId}`;
+        const history = JSON.parse(localStorage.getItem(chatKey)) || [];
+        if (history.length === 0) {
+          socket.emit("user_uttered", {
+            message: "hi",
+            session_id: userId,
+            metadata: { role: userRole }
+          });
+        }
+      }
+
+      // Check if URL contains user_id and role query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const userIdFromUrl = urlParams.get("user_id");
+      const roleFromUrl = urlParams.get("role");
+      if (userIdFromUrl) {
+        userId = userIdFromUrl;
+        useridInput.value = userId;
+        if (roleFromUrl) {
+          userRole = roleFromUrl;
+          roleSelection.value = userRole;
+        } else {
+          userRole = roleSelection.value;
+        }
+        history.replaceState(null, "", `?role=${encodeURIComponent(userRole)}&user_id=${encodeURIComponent(userId)}`);
+        loginContainer.style.display = "none";
+        chatContainer.style.display = "flex";
+        socket.emit("session_request", { session_id: `${userId}_${userRole}`, metadata: { role: userRole } });
+        loadChatHistory();
+        sendGreetIfNoHistory();
+      }
+
+      // Handle login button click
+      loginButton.addEventListener("click", () => {
+        const userInput = useridInput.value.trim();
+        if (!userInput) {
+          console.log("Please enter a user ID");
+          return;
+        }
+        userId = userInput;
+        userRole = roleSelection.value;
+        history.pushState(null, "", `?user_id=${encodeURIComponent(userId)}&role=${encodeURIComponent(userRole)}`);
+        loginContainer.style.display = "none";
+        chatContainer.style.display = "flex";
+        socket.emit("session_request", { session_id: `${userId}_${userRole}`, metadata: { role: userRole } });
+        loadChatHistory();
+        sendGreetIfNoHistory();
+      });
+
+      // Clear chat history for this user
+      clearHistoryButton.addEventListener("click", () => {
+        if (userId) {
+          localStorage.removeItem(`chat_${userId}_${userRole}`);
+          messages.innerHTML = "";
+          console.log(`Chat history cleared for user: ${userId}`);
+        }
+      });
+
+      // Handle sending messages
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!userId) {
+          console.log("Please log in first.");
+          return;
+        }
+        const msg = messageInput.value.trim();
+        if (msg) {
+          socket.emit("user_uttered", {
+            message: msg,
+            session_id: `${userId}_${userRole}`,
+            metadata: { role: userRole }
+          });
+          appendMessage(msg, "sent");
+          saveMessage(msg, "sent");
+          messageInput.value = "";
+        }
+      });
+
+      // Listen for bot messages
+      socket.on("bot_uttered", (response) => {
+        console.log("Bot uttered:", response);
+        if (response.text) {
+          appendMessage(response.text, "received");
+          saveMessage(response.text, "received");
+        }
+
+        let possibleButtons = null;
+        if (response.buttons && Array.isArray(response.buttons)) {
+          possibleButtons = response.buttons;
+        } else if (response.quick_replies && Array.isArray(response.quick_replies)) {
+          possibleButtons = response.quick_replies;
+        } else if (response.custom && Array.isArray(response.custom.buttons)) {
+          possibleButtons = response.custom.buttons;
+        }
+
+        if (possibleButtons) {
+          appendQuickReplies(possibleButtons);
+        }
+      });
+
+      // Append a message to the chat
+      function processMarkdown(text) {
+        return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      }
+
+      function appendMessage(msg, type) {
+        const item = document.createElement("div");
+        if (msg.includes("- ")) {
+          const lines = msg.split("\n");
+          let html = "";
+          lines.forEach(line => {
+            if (line.trim().startsWith("- ")) {
+              html += "<li>" + processMarkdown(line.trim().substring(2)) + "</li>";
+            } else if (line.trim().length > 0) {
+              html += "<p>" + processMarkdown(line.trim()) + "</p>";
+            }
+          });
+          item.innerHTML = "<ul>" + html + "</ul>";
+        } else {
+          item.innerHTML = processMarkdown(msg);
+        }
+        item.classList.add("message", `message_${type}`);
+        messages.appendChild(item);
+        scrollToBottom();
+      }
+
+      function appendQuickReplies(buttons) {
+        const oldContainer = document.querySelector(".quick-replies");
+        if (oldContainer) oldContainer.remove();
+
+        const container = document.createElement("div");
+        container.classList.add("quick-replies");
+
+        buttons.forEach(btnData => {
+          const btn = document.createElement("button");
+          btn.classList.add("button");
+          btn.textContent = btnData.title || btnData.payload || "Untitled";
+
+          btn.addEventListener("click", () => {
+            container.remove();
+            const userMessage = btnData.payload || btnData.title;
+            socket.emit("user_uttered", {
+              message: userMessage,
+              session_id: `${userId}_${userRole}`,
+              metadata: { role: userRole }
+            });
+            appendMessage(btnData.title || userMessage, "sent");
+            saveMessage(btnData.title || userMessage, "sent");
+          });
+
+          container.appendChild(btn);
+        });
+
+        messages.appendChild(container);
+        scrollToBottom();
+      }
+
+      function scrollToBottom() {
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function saveMessage(msg, type) {
+        if (!userId) return;
+        const chatKey = `chat_${userId}_${userRole}`;
+        const history = JSON.parse(localStorage.getItem(chatKey)) || [];
+        history.push({ msg, type });
+        localStorage.setItem(chatKey, JSON.stringify(history));
+      }
+
+      function loadChatHistory() {
+        if (!userId) return;
+        const chatKey = `chat_${userId}_${userRole}`;
+        const history = JSON.parse(localStorage.getItem(chatKey)) || [];
+        messages.innerHTML = "";
+        history.forEach(entry => {
+          appendMessage(entry.msg, entry.type);
+        });
+      }
+    </script>
+  </body>
+</html>
