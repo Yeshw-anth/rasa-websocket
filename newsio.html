@@ -87,13 +87,17 @@
   }
 
   /* ---------- CHAT CONTAINER ---------- */
-  #chat-container {
-    display: none;               /* Hidden until login */
-    /* flex: 1; */
-    flex-direction: column;
-    height: 100vh;
-    position: relative;          /* Anchor for absolutely-positioned form */
-  }
+ /* 1) In your CSS, replace height: 100vh with a calc() that uses --vh */
+#chat-container {
+  display: flex;
+  flex-direction: column;
+  /* instead of “height: 100vh;”: */
+  height: calc(var(--vh, 1vh) * 100);
+  position: relative;
+}
+
+/* (rest of your CSS remains the same) */
+
 
 
   /* Header as flex to prevent truncation */
@@ -184,15 +188,15 @@
   }
 
   #form {
-/*     position: absolute; */
-    bottom: 0;
-    left: 0;
-    width: 100%;
+    /* position: absolute; */
+    /* bottom: 0;
+    left: 0; */
+    /* width: 100%; */
     display: flex;
-    align-items: center;
+    /* align-items: center; */
     padding: 0.5rem 0.75rem;
     background-color: var(--volta-blue);
-    z-index: 5; /* ensure it’s above the message list */
+                      /* ensure it’s above the message list */
   }
 
   #message-input {
@@ -265,6 +269,7 @@
 
     #form {
       padding: 0.4rem 0.5rem;
+      display: flex;
     }
 
     #message-input {
@@ -295,7 +300,19 @@
       integrity="sha512-PU5S6BA03fRv1Q5fpwXjg5nlRrgdoguZ74urFInkbABMCENyx5oP3hrDzYMMPh3qdLdknIvrGj3yqZ4JuU7Nag=="
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
-    ></script>
+    >/* 2) In your JavaScript (early on, before rendering), set --vh to the actual innerHeight: */
+function setVhVariable() {
+  // window.innerHeight returns the visible viewport height
+  let vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+// call once on load…
+setVhVariable();
+
+// …and again any time the viewport size changes (e.g. orientation change, browser UI show/hide)
+window.addEventListener('resize', setVhVariable);
+</script>
   </head>
   <body>
     <!-- Login Container -->
