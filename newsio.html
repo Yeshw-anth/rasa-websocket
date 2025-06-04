@@ -5,183 +5,290 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Socket.IO Chat with Quick Replies & Local Storage</title>
     <style>
-      :root {
-        /* Volta-inspired aqua color */
-        --volta-blue: #00a0df;
-        --volta-blue-dark: #0084b9;
-        --white: #ffffff;
-        --black: #000000;
-        --light-gray: #f7f7f7;
-      }
+  :root {
+    --volta-blue: #00a0df;
+    --volta-blue-dark: #0084b9;
+    --white: #ffffff;
+    --black: #000000;
+    --light-gray: #f7f7f7;
 
-      body {
-        font-family: Roboto, sans-serif;
-        margin: 0;
-        padding: 0;
-        background-color: var(--light-gray);
-      }
+    /* Base font sizes (will shrink in media query) */
+    --font-base: 16px;
+    --font-large: 20px;
+    --font-small: 14px;
+  }
 
-      /* Login Container */
-      #login-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        background-color: var(--volta-blue);
-        color: var(--white);
-      }
+  /* Reset box-sizing and remove default margins/padding */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-      #login-container h2 {
-        margin-bottom: 20px;
-      }
+  body {
+    font-family: Roboto, sans-serif;
+    font-size: var(--font-base);
+    background-color: var(--light-gray);
+    color: var(--black);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 
-      #login-container input,
-      #login-container select {
-        padding: 10px;
-        border-radius: 5px;
-        border: 2px solid var(--white);
-        margin-bottom: 10px;
-        width: 220px;
-        font-size: 16px;
-        color: var(--black);
-      }
+  /* ---------- LOGIN CONTAINER ---------- */
+  #login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: var(--volta-blue);
+    color: var(--white);
+    padding: 1rem;
+  }
 
-      #login-container input::placeholder {
-        color: #666;
-      }
+  #login-container h2 {
+    margin-bottom: 1.25rem;
+    font-size: var(--font-large);
+    text-align: center;
+  }
 
-      #login-container button {
-        background: var(--volta-blue);
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        color: var(--white);
-        font-size: 16px;
-        cursor: pointer;
-      }
+  #login-container input,
+  #login-container select {
+    width: 90%;
+    max-width: 300px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 5px;
+    border: 2px solid var(--white);
+    font-size: var(--font-base);
+    color: var(--black);
+  }
 
-      #login-container button:hover {
-        background: var(--volta-blue-dark);
-      }
+  #login-container input::placeholder {
+    color: #666;
+  }
 
-      /* Chat Container */
-      #chat-container {
-        display: none;
-        flex-direction: column;
-        height: 100vh;
-      }
+  #login-container button {
+    width: 90%;
+    max-width: 200px;
+    background: var(--volta-blue);
+    border: none;
+    padding: 0.75rem;
+    border-radius: 5px;
+    color: var(--white);
+    font-size: var(--font-base);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
 
-      .header {
-        background-color: var(--volta-blue);
-        color: var(--white);
-        text-align: center;
-        padding: 12px;
-        position: relative;
-      }
+  #login-container button:hover {
+    background: var(--volta-blue-dark);
+  }
 
-      .title {
-        font-size: 23px;
-        margin: 0;
-      }
+  /* ---------- CHAT CONTAINER ---------- */
+  #chat-container {
+    display: none;               /* Hidden until login */
+    /* flex: 1; */
+    flex-direction: column;
+    height: 100vh;
+    position: relative;          /* Anchor for absolutely-positioned form */
+  }
 
-      #clear-history {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: var(--volta-blue);
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        color: var(--white);
-        cursor: pointer;
-      }
 
-      #clear-history:hover {
-        background: var(--volta-blue-dark);
-      }
+  /* Header as flex to prevent truncation */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--volta-blue);
+    color: var(--white);
+    padding: 0.75rem 1rem;
+    flex-shrink: 0;
+  }
 
-      #messages {
-        flex: 1;
-        padding: 10px;
-        overflow-y: auto;
-        background-color: var(--white);
-        display: flex;
-        flex-direction: column;
-      }
+  .title {
+    flex: 1;
+    font-size: var(--font-large);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-      .message {
-        padding: 0.5rem 1rem;
-        border-radius: 10px;
-        word-wrap: break-word;
-        max-width: 70%;
-        margin-bottom: 10px;
-        font-size: 16px;
-      }
+  #clear-history {
+    flex-shrink: 0;
+    background: var(--volta-blue);
+    border: none;
+    padding: 0.4rem 0.75rem;
+    border-radius: 3px;
+    color: var(--white);
+    font-size: var(--font-small);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
 
-      .message_received {
-        background: var(--light-gray);
-        color: var(--black);
-        border-bottom-left-radius: 0;
-        align-self: flex-start;
-      }
+  #clear-history:hover {
+    background: var(--volta-blue-dark);
+  }
 
-      .message_sent {
-        background: var(--volta-blue);
-        color: var(--white);
-        border-bottom-right-radius: 0;
-        align-self: flex-end;
-      }
+  /* Messages area scrolls beneath fixed form */
+    /* ---------------------------
+     Chat message bubbles
+     --------------------------- */
+  #messages {
+    flex: 1;
+    padding: 0.75rem 0.75rem 5rem; /* reserve bottom for fixed form */
+    overflow-y: auto;
+    background-color: var(--white);
+    display: flex;
+    flex-direction: column;
+  }
 
-      #form {
-        display: flex;
-        background-color: var(--volta-blue);
-        padding: 0.5rem;
-      }
+  .message {
+    padding: 0.5rem 0.9rem;
+    border-radius: 10px;
+    word-wrap: break-word;
+    max-width: 80%;
+    margin-bottom: 0.75rem;
+    font-size: var(--font-base);
+    line-height: 1.4;
+  }
 
-      #message-input {
-        flex-grow: 1;
-        padding: 0 1rem;
-        border-radius: 2rem;
-        border: none;
-        font-size: 16px;
-      }
+  .message_received {
+    background: var(--light-gray);
+    border-bottom-left-radius: 0;
+    align-self: flex-start;
+  }
 
-      #message-input:focus {
-        outline: none;
-      }
+  .message_sent {
+    background: var(--volta-blue);
+    color: var(--white);
+    border-bottom-right-radius: 0;
+    align-self: flex-end;
+  }
 
-      .button {
-        background: var(--volta-blue);
-        border: none;
-        padding: 0 15px;
-        margin-left: 0.5rem;
-        border-radius: 5px;
-        color: var(--white);
-        font: inherit;
-        cursor: pointer;
-      }
+  /* ---------------------------------- */
+  /*  Ensure bullets (dots) stay inside the bubble */
+  /* ---------------------------------- */
+  .message ul {
+    margin: 0;               /* Remove default top/bottom margins */
+    padding-left: 0.5rem;    /* Indent bullet + text by 1.2rem */
+    padding-top: 0.75rem;
+    list-style-position: inside; /* Bullet will be inside this padding */
+  }
 
-      .button:hover {
-        background: var(--volta-blue-dark);
-      }
 
-      .button:active {
-        background: var(--volta-blue-dark);
-      }
+  .message li {
+    margin-top: 0.3rem;
+    margin-bottom: 0.3rem;  /* Small gap between lines */
+  }
 
-      .quick-replies {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        margin-top: 10px;
-      }
+  #form {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--volta-blue);
+    z-index: 5; /* ensure it’s above the message list */
+  }
 
-      .quick-replies .button {
-        padding: 6px 10px;
-        font-size: 14px;
-      }
-    </style>
+  #message-input {
+    flex-grow: 1;
+    padding: 0.65rem 0.9rem;
+    border-radius: 1.5rem;
+    border: none;
+    font-size: var(--font-base);
+  }
+
+  #message-input:focus {
+    outline: none;
+  }
+
+  .button {
+    background: var(--volta-blue);
+    border: none;
+    padding: 0.65rem 1rem;
+    margin-left: 0.5rem;
+    border-radius: 5px;
+    color: var(--white);
+    font-size: var(--font-base);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .button:hover {
+    background: var(--volta-blue-dark);
+  }
+
+  .quick-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0.75rem 0 0.75rem;
+  }
+
+  .quick-replies .button {
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-small);
+    flex-shrink: 0;
+  }
+
+  /* ---------- RESPONSIVE TWEAKS FOR SMALL SCREENS ---------- */
+  @media screen and (max-width: 600px) {
+    :root {
+      --font-base: 14px;
+      --font-large: 18px;
+      --font-small: 12px;
+    }
+
+    .header {
+      padding: 0.5rem 0.75rem;
+    }
+
+    .title {
+      font-size: var(--font-large);
+    }
+
+    #clear-history {
+      padding: 0.3rem 0.6rem;
+      font-size: var(--font-small);
+    }
+
+    .message {
+      font-size: var(--font-base);
+      max-width: 90%;
+      padding: 0.4rem 0.7rem;
+    }
+
+    #form {
+      padding: 0.4rem 0.5rem;
+    }
+
+    #message-input {
+      padding: 0.6rem 0.8rem;
+      font-size: var(--font-base);
+    }
+
+    .button {
+      padding: 0.6rem 0.8rem;
+      font-size: var(--font-base);
+    }
+
+    .quick-replies {
+      margin: 0.5rem 0.5rem 0 0.5rem;
+      gap: 0.4rem;
+    }
+
+    .quick-replies .button {
+      padding: 0.4rem 0.6rem;
+      font-size: var(--font-small);
+    }
+  }
+</style>
+
     <!-- Socket.IO client library from CDN -->
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"
@@ -208,7 +315,7 @@
     <!-- Chat Container -->
     <div id="chat-container">
       <header class="header">
-        <p class="title">Chat with Volta Chatbot</p>
+        <b class="title">Chat with Volta Chatbot</b>
         <button id="clear-history">Clear History</button>
       </header>
       <div id="messages"></div>
@@ -250,14 +357,20 @@
       function sendGreetIfNoHistory() {
         const chatKey = `chat_${userId}`;
         const history = JSON.parse(localStorage.getItem(chatKey)) || [];
-        if (history.length === 0) {
+        console.log("Chat history:", history);
+        // Force session reset to clear old slots/tracker
+        socket.emit("session_expired", {
+          session_id: `${userId}_${userRole}`,
+        });
           socket.emit("user_uttered", {
             message: "hi",
-            session_id: userId,
-            metadata: { role: userRole }
+            session_id: `${userId}_${userRole}`,
+            metadata: { role: userRole ,
+              token:"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjX2lkIjoiMTEwNCIsImNfbmFtZSI6bnVsbCwiY19maXJzdF9uYW1lIjoieWVzaCIsImNfbGFzdF9uYW1lIjoid2FudGgiLCJjX21vYmlsZSI6Ijk1MTU1NDY2NDYiLCJjX2VtYWlsIjoiIiwiY19hcHBsZV9pZCI6IiIsImNvbnN1bWVyX2lkIjoiQ0lELTAwMDAxMTA0IiwiY19hZGRyZXNzIjoiIiwiY19jcmVhdGVkX2RhdGUiOiIyMDI1LTA1LTI3IDExOjQzOjU2IiwiY19sb2dpblR5cGUiOiJtb2JpbGUiLCJjX2xvZ2luX3N0YXR1cyI6IjEiLCJkZXZpY2VfaWQiOiIiLCJkZXZpY2VfdG9rZW4iOiIxMjM0NTY3ODkwIiwiQVBJX1RJTUUiOjE3NDkwMTQyODR9.vpDSm9SVqBwlAemCi1XEi6rVzB1Eu-I6hd9l-51ytbE"
+           }
           });
         }
-      }
+      
 
       // Check if URL contains user_id and role query parameters
       const urlParams = new URLSearchParams(window.location.search);
@@ -275,7 +388,9 @@
         history.replaceState(null, "", `?role=${encodeURIComponent(userRole)}&user_id=${encodeURIComponent(userId)}`);
         loginContainer.style.display = "none";
         chatContainer.style.display = "flex";
-        socket.emit("session_request", { session_id: `${userId}_${userRole}`, metadata: { role: userRole } });
+        socket.emit("session_request", { session_id: `${userId}_${userRole}`, 
+          // metadata: { role: userRole }
+         });
         loadChatHistory();
         sendGreetIfNoHistory();
       }
@@ -292,7 +407,9 @@
         history.pushState(null, "", `?user_id=${encodeURIComponent(userId)}&role=${encodeURIComponent(userRole)}`);
         loginContainer.style.display = "none";
         chatContainer.style.display = "flex";
-        socket.emit("session_request", { session_id: `${userId}_${userRole}`, metadata: { role: userRole } });
+        socket.emit("session_request", { session_id: `${userId}_${userRole}`, 
+          // metadata: { role: userRole }
+         });
         loadChatHistory();
         sendGreetIfNoHistory();
       });
@@ -306,6 +423,27 @@
         }
       });
 
+      // handle session inactivity
+
+      let inactivityTimeout;
+      const INACTIVITY_LIMIT = 2* 60 * 1000; // 5 minutes
+
+      function resetInactivityTimer() {
+        clearTimeout(inactivityTimeout);
+        inactivityTimeout = setTimeout(() => {
+          console.log("Inactivity detected. Notifying Rasa...");
+          socket.emit("user_uttered", {
+            message: "/session_expired", // Custom intent to handle inactivity
+            session_id: `${userId}_${userRole}`,
+          });
+        }, INACTIVITY_LIMIT);
+      }
+
+      // Reset the timer on user activity
+      document.addEventListener("mousemove", resetInactivityTimer);
+      document.addEventListener("keydown", resetInactivityTimer);
+      document.addEventListener("click", resetInactivityTimer);
+
       // Handle sending messages
       form.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -318,7 +456,7 @@
           socket.emit("user_uttered", {
             message: msg,
             session_id: `${userId}_${userRole}`,
-            metadata: { role: userRole }
+            // metadata: { role: userRole }
           });
           appendMessage(msg, "sent");
           saveMessage(msg, "sent");
@@ -392,7 +530,7 @@
             socket.emit("user_uttered", {
               message: userMessage,
               session_id: `${userId}_${userRole}`,
-              metadata: { role: userRole }
+              // metadata: { role: userRole }
             });
             appendMessage(btnData.title || userMessage, "sent");
             saveMessage(btnData.title || userMessage, "sent");
